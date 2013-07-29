@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
@@ -49,6 +50,9 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
 
   private final Map<String, AcmDevice> acmDevices;
 
+  // This value should be set from outside depending on the attached device
+  // (default = 0, usb devices have at least one interface)
+  public Integer selectedInterface = 0;
   private UsbManager usbManager;
   private PendingIntent usbPermissionIntent;
   private BroadcastReceiver usbDevicePermissionReceiver;
@@ -79,7 +83,8 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
         + deviceName);
     Preconditions.checkState(usbManager.hasPermission(usbDevice), "Permission denied: "
         + deviceName);
-    UsbInterface usbInterface = usbDevice.getInterface(1);
+    // Here the selected usb interface, which could be choose from outside, is set.
+    UsbInterface usbInterface = usbDevice.getInterface(this.selectedInterface);
     UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(usbDevice);
     Preconditions.checkNotNull(usbDeviceConnection, "Failed to open device: " + deviceName);
     if (DEBUG) {
@@ -93,7 +98,7 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    usbManager = (UsbManager) getSystemService(USB_SERVICE);
+    usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
     usbPermissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
     registerReceiver(usbDevicePermissionReceiver, new IntentFilter(ACTION_USB_PERMISSION));
     registerReceiver(usbDeviceDetachedReceiver, new IntentFilter(
