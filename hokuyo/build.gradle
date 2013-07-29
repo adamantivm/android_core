@@ -36,3 +36,9 @@ dependencies {
   testCompile 'junit:junit:4.8.2'
 }
 
+// JAC: Hooking-up 'install' to publishToMavenLocal, which is the default Gradle
+// target called by catkin_make for this project. Install is the right target
+// for this type of library (not an android-library) to get published in the local
+// Maven repository. Solved like this instead of adapting the type of library
+// because this module is still pending decision on final location
+publishToMavenLocal.dependsOn 'install'
