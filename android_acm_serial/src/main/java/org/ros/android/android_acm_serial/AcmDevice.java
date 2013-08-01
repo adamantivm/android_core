@@ -1,12 +1,12 @@
 /*
  * Copyright (C) 2011 Google Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -22,6 +22,9 @@ import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.ros.exception.RosRuntimeException;
 
 import java.io.IOException;
@@ -43,9 +46,11 @@ public class AcmDevice {
   private final OutputStream outputStream;
   private final UsbRequestPool usbRequestPool;
 
+  private static final Log log = LogFactory.getLog(AcmDevice.class);
+
   public AcmDevice(UsbDeviceConnection usbDeviceConnection, UsbInterface usbInterface) {
     Preconditions.checkNotNull(usbDeviceConnection);
-    Preconditions.checkNotNull(usbInterface);  
+    Preconditions.checkNotNull(usbInterface);
     Preconditions.checkState(usbDeviceConnection.claimInterface(usbInterface, true));
     this.usbDeviceConnection = usbDeviceConnection;
     this.usbInterface = usbInterface;
@@ -54,6 +59,7 @@ public class AcmDevice {
     UsbEndpoint incomingEndpoint = null;
     for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
       UsbEndpoint endpoint = usbInterface.getEndpoint(i);
+      log.info("Endpoint " + i + "/" + usbInterface.getEndpointCount() + ": " + endpoint + ". Type = " + endpoint.getType());
       if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
         if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) {
           outgoingEndpoint = endpoint;
@@ -73,6 +79,8 @@ public class AcmDevice {
     outputStream = new AcmOutputStream(usbRequestPool, outgoingEndpoint);
     inputStream = new AcmInputStream(usbDeviceConnection, incomingEndpoint);
   }
+
+
 
   public void setLineCoding(BitRate bitRate, StopBits stopBits, Parity parity, DataBits dataBits) {
     ByteBuffer buffer = ByteBuffer.allocate(7);

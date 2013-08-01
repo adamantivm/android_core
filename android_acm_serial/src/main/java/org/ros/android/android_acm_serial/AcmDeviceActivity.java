@@ -1,12 +1,12 @@
 /*
  * Copyright (C) 2011 Google Inc.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -45,14 +45,13 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
 
   private static final boolean DEBUG = true;
   private static final Log log = LogFactory.getLog(AcmDeviceActivity.class);
+  // Default interface to open on connected USB devices
+  private static final int DEFAULT_INTERFACE = 0;
 
   static final String ACTION_USB_PERMISSION = "org.ros.android.USB_PERMISSION";
 
   private final Map<String, AcmDevice> acmDevices;
 
-  // This value should be set from outside depending on the attached device
-  // (default = 0, usb devices have at least one interface)
-  public Integer selectedInterface = 0;
   private UsbManager usbManager;
   private PendingIntent usbPermissionIntent;
   private BroadcastReceiver usbDevicePermissionReceiver;
@@ -60,39 +59,70 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
 
   protected AcmDeviceActivity(String notificationTicker, String notificationTitle) {
     super(notificationTicker, notificationTitle);
+    log.info("<New> - Enter - v0.1");
     acmDevices = Maps.newConcurrentMap();
     usbDevicePermissionReceiver =
         new UsbDevicePermissionReceiver(new UsbDevicePermissionCallback() {
           @Override
           public void onPermissionGranted(UsbDevice usbDevice) {
+            log.info("New ACM device. Permission Granted");
             newAcmDevice(usbDevice);
           }
 
           @Override
           public void onPermissionDenied() {
+              log.info("New ACM device. Permission Denied");
             AcmDeviceActivity.this.onPermissionDenied();
           }
         });
     usbDeviceDetachedReceiver = new UsbDeviceDetachedReceiver(acmDevices);
+    log.info("<New> - Exit");
   }
 
+    /**
+     * Creates a new AcmDevice for the newly connected
+     */
   private void newAcmDevice(UsbDevice usbDevice) {
-    Preconditions.checkNotNull(usbDevice);
-    String deviceName = usbDevice.getDeviceName();
-    Preconditions.checkState(!acmDevices.containsKey(deviceName), "Already connected to device: "
-        + deviceName);
-    Preconditions.checkState(usbManager.hasPermission(usbDevice), "Permission denied: "
-        + deviceName);
-    // Here the selected usb interface, which could be choose from outside, is set.
-    UsbInterface usbInterface = usbDevice.getInterface(this.selectedInterface);
-    UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(usbDevice);
-    Preconditions.checkNotNull(usbDeviceConnection, "Failed to open device: " + deviceName);
-    if (DEBUG) {
-      log.info("Adding new ACM device: " + deviceName);
+    try {
+        Preconditions.checkNotNull(usbDevice);
+        String deviceName = usbDevice.getDeviceName();
+        Preconditions.checkState(!acmDevices.containsKey(deviceName), "Already connected to device: "
+            + deviceName);
+        Preconditions.checkState(usbManager.hasPermission(usbDevice), "Permission denied: "
+            + deviceName);
+
+        // Here the selected usb interface, which could be choose from outside, is set.
+        log.info("newAcmDevice: we will open USB interface " + this.DEFAULT_INTERFACE +
+                " of " + usbDevice.getInterfaceCount());
+        UsbInterface usbInterface = usbDevice.getInterface(this.DEFAULT_INTERFACE);
+        UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(usbDevice);
+        log.info("newAcmDevice: device interface opened");
+        Preconditions.checkNotNull(usbDeviceConnection, "Failed to open device: " + deviceName);
+        if (DEBUG) {
+          log.info("Adding new ACM device: " + deviceName);
+        }
+        AcmDevice acmDevice = new AcmDevice(usbDeviceConnection, usbInterface);
+        acmDevices.put(deviceName, acmDevice);
+        AcmDeviceActivity.this.onPermissionGranted(acmDevice);
+    } catch(IllegalStateException e) {
+        log.info("A precondition failed: " + e);
+    } catch(IllegalArgumentException e) {
+        log.info("Failed to create ACM device: " + e);
     }
-    AcmDevice acmDevice = new AcmDevice(usbDeviceConnection, usbInterface);
-    acmDevices.put(deviceName, acmDevice);
-    AcmDeviceActivity.this.onPermissionGranted(acmDevice);
+  }
+
+    /**
+     * This method is primarily for implementers of AcmDeviceActivity to override to match
+     * their own needs.
+     * The method selects a given interface and opens it with usbDevice.getInterface.
+     * If no override implementation is provided, it chooses <code>DEFAULT_INTERFACE</code>
+     * which is 0 by default.
+     *
+     * @param the usbDevice being connected
+     * @return the selected ACM UsbInterface
+     */
+  protected UsbInterface getInterface(UsbDevice usbDevice) {
+      return usbDevice.getInterface(this.DEFAULT_INTERFACE);
   }
 
   @Override
@@ -137,7 +167,7 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
 
   /**
    * Request permission from the user to access the supplied {@link UsbDevice}.
-   * 
+   *
    * @param usbDevice
    *          the {@link UsbDevice} that provides ACM serial
    * @param callback
