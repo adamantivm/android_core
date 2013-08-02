@@ -49,6 +49,28 @@ public class AcmDevice {
 
   private static final Log log = LogFactory.getLog(AcmDevice.class);
 
+    /**
+     * Auxiliary data class. Used to group the pair of USB endpoints
+     * used for ACM communication
+     */
+  private class AcmUsbEndpoints {
+      private final UsbEndpoint incoming;
+      private final UsbEndpoint outgoing;
+
+      public AcmUsbEndpoints(UsbEndpoint incoming, UsbEndpoint outgoing) {
+          this.incoming = incoming;
+          this.outgoing = outgoing;
+      }
+
+      private UsbEndpoint getOutgoing() {
+          return outgoing;
+      }
+
+      private UsbEndpoint getIncoming() {
+          return incoming;
+      }
+  }
+
   public AcmDevice(UsbDeviceConnection usbDeviceConnection, UsbDevice usbDevice) {
     Preconditions.checkNotNull(usbDeviceConnection);
     this.usbDeviceConnection = usbDeviceConnection;
@@ -56,7 +78,7 @@ public class AcmDevice {
     // Go through all declared interfaces and automatically select the one that looks
     // like an ACM interface
     UsbInterface usbInterface1 = null;
-    UsbEndpoint[] acmUsbEndpoints = null;
+    AcmUsbEndpoints acmUsbEndpoints = null;
     for(int i=0;i<usbDevice.getInterfaceCount() && acmUsbEndpoints == null;i++) {
         usbInterface1 = usbDevice.getInterface(i);
         Preconditions.checkNotNull(usbInterface1);
@@ -70,11 +92,11 @@ public class AcmDevice {
     usbInterface = usbInterface1;
 
     usbRequestPool = new UsbRequestPool(usbDeviceConnection);
-    usbRequestPool.addEndpoint(acmUsbEndpoints[1], null);
+    usbRequestPool.addEndpoint(acmUsbEndpoints.getOutgoing(), null);
     usbRequestPool.start();
 
-    outputStream = new AcmOutputStream(usbRequestPool, acmUsbEndpoints[1]);
-    inputStream = new AcmInputStream(usbDeviceConnection, acmUsbEndpoints[0]);
+    outputStream = new AcmOutputStream(usbRequestPool, acmUsbEndpoints.getOutgoing());
+    inputStream = new AcmInputStream(usbDeviceConnection, acmUsbEndpoints.getIncoming());
   }
 
     /**
@@ -83,7 +105,7 @@ public class AcmDevice {
      * @return Array with incoming (first) and outgoing (second) USB endpoints
      * @return <code>null</code>  in case either of the endpoints is not found
      */
-  private UsbEndpoint[] getAcmEndpoints(UsbInterface usbInterface) {
+  private AcmUsbEndpoints getAcmEndpoints(UsbInterface usbInterface) {
       UsbEndpoint outgoingEndpoint = null;
       UsbEndpoint incomingEndpoint = null;
       for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
@@ -100,7 +122,7 @@ public class AcmDevice {
       if(outgoingEndpoint == null || incomingEndpoint == null) {
           return null;
       } else {
-          return new UsbEndpoint[]{incomingEndpoint, outgoingEndpoint};
+          return new AcmUsbEndpoints(incomingEndpoint, outgoingEndpoint);
       }
   }
 

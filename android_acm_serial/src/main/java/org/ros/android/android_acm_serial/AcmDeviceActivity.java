@@ -45,8 +45,6 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
 
   private static final boolean DEBUG = true;
   private static final Log log = LogFactory.getLog(AcmDeviceActivity.class);
-  // Default interface to open on connected USB devices
-  private static final int DEFAULT_INTERFACE = 0;
 
   static final String ACTION_USB_PERMISSION = "org.ros.android.USB_PERMISSION";
 
@@ -104,20 +102,6 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
     } catch(IllegalArgumentException e) {
         log.info("Failed to create ACM device: " + e);
     }
-  }
-
-    /**
-     * This method is primarily for implementers of AcmDeviceActivity to override to match
-     * their own needs.
-     * The method selects a given interface and opens it with usbDevice.getInterface.
-     * If no override implementation is provided, it chooses <code>DEFAULT_INTERFACE</code>
-     * which is 0 by default.
-     *
-     * @param the usbDevice being connected
-     * @return the selected ACM UsbInterface
-     */
-  protected UsbInterface getInterface(UsbDevice usbDevice) {
-      return usbDevice.getInterface(this.DEFAULT_INTERFACE);
   }
 
   @Override
