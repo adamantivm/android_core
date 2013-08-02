@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 
@@ -48,39 +49,60 @@ public class AcmDevice {
 
   private static final Log log = LogFactory.getLog(AcmDevice.class);
 
-  public AcmDevice(UsbDeviceConnection usbDeviceConnection, UsbInterface usbInterface) {
+  public AcmDevice(UsbDeviceConnection usbDeviceConnection, UsbDevice usbDevice) {
     Preconditions.checkNotNull(usbDeviceConnection);
-    Preconditions.checkNotNull(usbInterface);
-    Preconditions.checkState(usbDeviceConnection.claimInterface(usbInterface, true));
     this.usbDeviceConnection = usbDeviceConnection;
-    this.usbInterface = usbInterface;
 
-    UsbEndpoint outgoingEndpoint = null;
-    UsbEndpoint incomingEndpoint = null;
-    for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
-      UsbEndpoint endpoint = usbInterface.getEndpoint(i);
-      log.info("Endpoint " + i + "/" + usbInterface.getEndpointCount() + ": " + endpoint + ". Type = " + endpoint.getType());
-      if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-        if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) {
-          outgoingEndpoint = endpoint;
-        } else {
-          incomingEndpoint = endpoint;
-        }
-      }
+    // Go through all declared interfaces and automatically select the one that looks
+    // like an ACM interface
+    UsbInterface usbInterface1 = null;
+    UsbEndpoint[] acmUsbEndpoints = null;
+    for(int i=0;i<usbDevice.getInterfaceCount() && acmUsbEndpoints == null;i++) {
+        usbInterface1 = usbDevice.getInterface(i);
+        Preconditions.checkNotNull(usbInterface1);
+        Preconditions.checkState(usbDeviceConnection.claimInterface(usbInterface1, true));
+        acmUsbEndpoints = getAcmEndpoints(usbInterface1);
     }
-    if (outgoingEndpoint == null || incomingEndpoint == null) {
-      throw new IllegalArgumentException("Not all endpoints found.");
+    if(acmUsbEndpoints == null) {
+        throw new IllegalArgumentException("Couldn't find an interface that looks like ACM on this USB device: " + usbDevice);
     }
+
+    usbInterface = usbInterface1;
 
     usbRequestPool = new UsbRequestPool(usbDeviceConnection);
-    usbRequestPool.addEndpoint(outgoingEndpoint, null);
+    usbRequestPool.addEndpoint(acmUsbEndpoints[1], null);
     usbRequestPool.start();
 
-    outputStream = new AcmOutputStream(usbRequestPool, outgoingEndpoint);
-    inputStream = new AcmInputStream(usbDeviceConnection, incomingEndpoint);
+    outputStream = new AcmOutputStream(usbRequestPool, acmUsbEndpoints[1]);
+    inputStream = new AcmInputStream(usbDeviceConnection, acmUsbEndpoints[0]);
   }
 
-
+    /**
+     * Goes through the given UsbInterface's endpoints and finds the incoming
+     * and outgoing bulk transfer endpoints.
+     * @return Array with incoming (first) and outgoing (second) USB endpoints
+     * @return <code>null</code>  in case either of the endpoints is not found
+     */
+  private UsbEndpoint[] getAcmEndpoints(UsbInterface usbInterface) {
+      UsbEndpoint outgoingEndpoint = null;
+      UsbEndpoint incomingEndpoint = null;
+      for (int i = 0; i < usbInterface.getEndpointCount(); i++) {
+          UsbEndpoint endpoint = usbInterface.getEndpoint(i);
+          log.info("Endpoint " + i + "/" + usbInterface.getEndpointCount() + ": " + endpoint + ". Type = " + endpoint.getType());
+          if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
+              if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) {
+                  outgoingEndpoint = endpoint;
+              } else if(endpoint.getDirection() == UsbConstants.USB_DIR_IN) {
+                  incomingEndpoint = endpoint;
+              }
+          }
+      }
+      if(outgoingEndpoint == null || incomingEndpoint == null) {
+          return null;
+      } else {
+          return new UsbEndpoint[]{incomingEndpoint, outgoingEndpoint};
+      }
+  }
 
   public void setLineCoding(BitRate bitRate, StopBits stopBits, Parity parity, DataBits dataBits) {
     ByteBuffer buffer = ByteBuffer.allocate(7);

@@ -91,17 +91,12 @@ public abstract class AcmDeviceActivity extends RosActivity implements AcmDevice
         Preconditions.checkState(usbManager.hasPermission(usbDevice), "Permission denied: "
             + deviceName);
 
-        // Here the selected usb interface, which could be choose from outside, is set.
-        log.info("newAcmDevice: we will open USB interface " + this.DEFAULT_INTERFACE +
-                " of " + usbDevice.getInterfaceCount());
-        UsbInterface usbInterface = usbDevice.getInterface(this.DEFAULT_INTERFACE);
         UsbDeviceConnection usbDeviceConnection = usbManager.openDevice(usbDevice);
-        log.info("newAcmDevice: device interface opened");
         Preconditions.checkNotNull(usbDeviceConnection, "Failed to open device: " + deviceName);
         if (DEBUG) {
           log.info("Adding new ACM device: " + deviceName);
         }
-        AcmDevice acmDevice = new AcmDevice(usbDeviceConnection, usbInterface);
+        AcmDevice acmDevice = new AcmDevice(usbDeviceConnection, usbDevice);
         acmDevices.put(deviceName, acmDevice);
         AcmDeviceActivity.this.onPermissionGranted(acmDevice);
     } catch(IllegalStateException e) {
