@@ -46,5 +46,10 @@ allprojects {
 subprojects {
     if (name != 'docs') {
         apply plugin: 'ros-android'
+        buildscript {
+            dependencies {
+                classpath 'com.android.tools.build:gradle:0.6.1'
+            }
+        }
     }
 }
